@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SILIRA Media</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div>
+        <p class="eyebrow">SILIRA</p>
+        <h1>Media Finder</h1>
+        <p class="subtext">Find the right Pexels photo or video for your next project.</p>
+      </div>
+      <a class="pexels-link" href="https://www.pexels.com/" target="_blank" rel="noopener">Photos & videos provided by Pexels</a>
+    </header>
+
+    <section class="search-panel">
+      <form id="search-form">
+        <label for="query">What are you looking for?</label>
+        <div class="search-row">
+          <input id="query" name="query" type="search" placeholder="e.g. African business meeting" autocomplete="off" required />
+          <select id="media-type" aria-label="Media type">
+            <option value="photo">Photos</option>
+            <option value="video">Videos</option>
+          </select>
+          <button type="submit">Search</button>
+        </div>
+      </form>
+      <p id="status" class="status"></p>
+    </section>
+
+    <section id="results" class="results" aria-live="polite"></section>
+  </main>
+
+  <script>
+    const form = document.getElementById('search-form');
+    const queryInput = document.getElementById('query');
+    const mediaType = document.getElementById('media-type');
+    const results = document.getElementById('results');
+    const status = document.getElementById('status');
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const q = queryInput.value.trim();
+      if (!q) return;
+
+      results.innerHTML = '';
+      status.textContent = 'Searching Pexels...';
+
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(q)}&media_type=${mediaType.value}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Search failed');
+
+        status.textContent = `${data.total_results.toLocaleString()} results found`;
+        renderResults(data.results);
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    });
+
+    function renderResults(items) {
+      if (!items.length) {
+        results.innerHTML = '<div class="empty">No results found. Try another search.</div>';
+        return;
+      }
+
+      results.innerHTML = items.map(item => `
+        <article class="card">
+          <div class="media-wrap">
+            ${item.type === 'video'
+              ? `<video src="${escapeAttr(item.media_url || '')}" poster="${escapeAttr(item.preview || '')}" controls muted preload="metadata"></video>`
+              : `<img src="${escapeAttr(item.preview || '')}" alt="${escapeAttr(item.title)}" loading="lazy" />`
+            }
+          </div>
+          <div class="card-body">
+            <h2>${escapeHtml(item.title)}</h2>
+            <p>By ${escapeHtml(item.creator)}</p>
+            <div class="actions">
+              ${item.media_url ? `<a class="button primary" href="${escapeAttr(item.media_url)}" target="_blank" rel="noopener">Open / Download</a>` : ''}
+              <a class="button secondary" href="${escapeAttr(item.pexels_url)}" target="_blank" rel="noopener">View on Pexels</a>
+            </div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+    }
+
+    function escapeAttr(value) {
+      return escapeHtml(value);
+    }
+  </script>
+</body>
+</html>
